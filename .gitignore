@@ -36,6 +36,12 @@ yarn-error.log*
 .env.*.local
 !.env.example
 
+# API key saved by the extension's AI login
+.llm-login.json
+
+# Google refresh token saved by the extension's Google Sheet login
+.google-login.json
+
 # local tailor runs (compiled PDFs, per-job artifacts)
 /runs/*
 !/runs/.gitkeep
@@ -46,6 +52,12 @@ yarn-error.log*
 # auto-backup before Make MetaData overwrites master JSON (per archetype)
 /data/master_resume.backup.json
 /data/master_resume_*.backup.json
+
+# personal resumes and what's built from them. The samples already tracked in data/
+# stay tracked, so edits to those still show up in git.
+/data/template_*.tex
+/data/master_resume_*.json
+/data/*.pdf
 
 # local application tracker records (sensitive: per-job fabrication traces)
 /data/applications/

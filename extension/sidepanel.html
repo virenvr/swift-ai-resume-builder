@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Taylor</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header>
+      <button id="create" type="button" title="Read the job on this page and build a tailored resume">
+        Create resume
+      </button>
+      <button id="grab" class="secondary" type="button" title="Copy the selected text, or the job on this page, into Job input so you can review it first">
+        Use this page
+      </button>
+      <button id="ai" class="secondary" type="button" aria-expanded="false" aria-controls="login">AI login</button>
+      <button id="sheet" class="secondary" type="button" aria-expanded="false" aria-controls="google">Google Sheet</button>
+      <button id="resumes" class="secondary" type="button" aria-expanded="false" aria-controls="upload">Upload resume</button>
+      <a href="http://localhost:3000" target="_blank" rel="noreferrer">Open in tab</a>
+    </header>
+    <p id="notice" role="status" hidden></p>
+    <form id="login" hidden>
+      <p id="login-status" role="status"></p>
+      <label>
+        Provider
+        <select id="provider">
+          <option value="gemini">Google Gemini</option>
+          <option value="anthropic">Anthropic Claude</option>
+          <option value="openai">OpenAI ChatGPT</option>
+          <option value="openai-compatible">Other (OpenRouter, Groq, Ollama…)</option>
+        </select>
+      </label>
+      <label id="base-url-field" hidden>
+        Server URL
+        <input id="base-url" type="url" placeholder="https://openrouter.ai/api/v1" />
+      </label>
+      <label>
+        API key
+        <input id="api-key" type="password" autocomplete="off" spellcheck="false" />
+      </label>
+      <a id="key-link" target="_blank" rel="noreferrer">Get an API key</a>
+      <label>
+        Model
+        <input id="model" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="login-actions">
+        <button id="login-submit" type="submit">Log in</button>
+        <button id="logout" class="secondary" type="button" hidden>Log out</button>
+      </div>
+    </form>
+    <section id="google" hidden>
+      <p id="google-status" role="status"></p>
+      <a id="sheet-link" target="_blank" rel="noreferrer" hidden>Open sheet</a>
+      <form id="sheet-form" hidden>
+        <label>
+          Google Sheet link
+          <input id="sheet-url" type="url" required spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…" />
+        </label>
+        <button id="sheet-submit" type="submit">Use this sheet</button>
+      </form>
+      <div class="login-actions">
+        <button id="google-connect" type="button">Log in with Google</button>
+        <button id="google-sync" class="secondary" type="button" hidden>Sync now</button>
+        <button id="google-logout" class="secondary" type="button" hidden>Log out</button>
+      </div>
+    </section>
+    <form id="upload" hidden>
+      <p id="upload-status" role="status">Upload your LaTeX resume (.tex) with its section markers. PDF and Word files can't be tailored.</p>
+      <label>
+        Save as
+        <select id="upload-target"></select>
+      </label>
+      <label id="upload-name-field">
+        Resume name
+        <input id="upload-name" autocomplete="off" spellcheck="false" placeholder="e.g. Backend" />
+      </label>
+      <label>
+        File
+        <input id="upload-file" type="file" accept=".tex" required />
+      </label>
+      <div class="login-actions">
+        <button id="upload-submit" type="submit">Upload</button>
+      </div>
+    </form>
+    <section id="offline" hidden>
+      <h1>Taylor isn't running</h1>
+      <p>The extension uses the local app for AI tailoring and PDF compiles. Start it from the project folder:</p>
+      <pre>npm run dev</pre>
+      <button id="retry" type="button">Try again</button>
+    </section>
+    <iframe id="app" title="Taylor" allow="clipboard-read; clipboard-write" hidden></iframe>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

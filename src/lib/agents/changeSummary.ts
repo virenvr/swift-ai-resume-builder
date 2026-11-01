@@ -1,5 +1,5 @@
 import { fillTemplate, PROMPT_PLACEHOLDERS } from "@/lib/agents/prompts";
-import { generateJson, isDemoMode } from "@/lib/gemini/client";
+import { generateJson, isDemoMode } from "@/lib/llm/client";
 import {
   ChangeSummary,
   ChangeSummarySchema,

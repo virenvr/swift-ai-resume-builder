@@ -1,6 +1,6 @@
 import { extractKeywords } from "@/lib/agents/extractKeywords";
 import { parseJd } from "@/lib/agents/parseJd";
-import { isDemoMode } from "@/lib/gemini/client";
+import { isDemoMode } from "@/lib/llm/client";
 import { resolveJdInput } from "@/lib/ingest/fetchJdUrl";
 import { NextResponse } from "next/server";
 import { z } from "zod";

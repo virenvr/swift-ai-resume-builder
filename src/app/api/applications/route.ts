@@ -1,6 +1,7 @@
+import { syncSheet } from "@/lib/google/sheet";
 import { getStore } from "@/lib/tracker/store";
 import { NewApplicationInputSchema } from "@/lib/tracker/types";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   try {
     const input = NewApplicationInputSchema.parse(await request.json());
     const application = await getStore().create(input);
+    after(syncSheet);
     return NextResponse.json({ ok: true, application });
   } catch (error) {
     const message =

@@ -42,7 +42,7 @@ Local-first webapp for real-time JD → keyword-aligned LaTeX resume, aimed at A
 ## Testable now
 
 ```bash
-cp .env.example .env.local   # add GEMINI_API_KEY (optional for UI mock)
+cp .env.example .env.local   # add your AI provider key (optional for UI mock)
 npm run dev
 ```
 

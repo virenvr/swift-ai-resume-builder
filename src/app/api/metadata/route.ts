@@ -1,5 +1,5 @@
 import { makeAllMetadata } from "@/lib/agents/makeMetadata";
-import { isDemoMode } from "@/lib/gemini/client";
+import { isDemoMode } from "@/lib/llm/client";
 import { NextResponse } from "next/server";
 import path from "path";
 import { z } from "zod";

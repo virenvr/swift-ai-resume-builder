@@ -23,6 +23,11 @@ export function resumeTypeLabel(type: string): string {
   return LABELS[type] ?? type.toUpperCase();
 }
 
+/** Types that parsing may switch to. Any other type is one the user chose on purpose. */
+export function isRoleMappedResumeType(type: string): boolean {
+  return ["ml", "ds", "swe"].includes(type);
+}
+
 /** Deterministic role-family → resume-type mapping (no AI). */
 export function resumeTypeFromRoleFamily(roleFamily: RoleFamily): string {
   switch (roleFamily) {

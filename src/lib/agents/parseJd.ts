@@ -1,5 +1,5 @@
 import { fillTemplate, PROMPT_PLACEHOLDERS } from "@/lib/agents/prompts";
-import { generateJson, isDemoMode } from "@/lib/gemini/client";
+import { generateJson, isDemoMode } from "@/lib/llm/client";
 import { JdSuggestions, JdSuggestionsSchema } from "@/lib/types";
 
 function mockSuggestions(jdText: string): JdSuggestions {
@@ -69,7 +69,7 @@ function mockSuggestions(jdText: string): JdSuggestions {
       ? "Long JD — Middle Ground is a safe starting point (hint only)."
       : null,
     notes: [
-      "DEMO_MODE mock parse — heuristics only. Set GEMINI_API_KEY and DEMO_MODE=false for model parse.",
+      "DEMO_MODE mock parse — heuristics only. Set your provider key and DEMO_MODE=false for model parse.",
     ],
   });
 }

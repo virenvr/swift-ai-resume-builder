@@ -1,6 +1,7 @@
+import { syncSheet } from "@/lib/google/sheet";
 import { getStore } from "@/lib/tracker/store";
 import { ApplicationPatchSchema } from "@/lib/tracker/types";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,7 @@ export async function PATCH(request: Request, ctx: RouteContext) {
     const { id } = await ctx.params;
     const patch = ApplicationPatchSchema.parse(await request.json());
     const application = await getStore().update(id, patch);
+    after(syncSheet);
     return NextResponse.json({ ok: true, application });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Update failed";
@@ -24,6 +26,7 @@ export async function DELETE(_request: Request, ctx: RouteContext) {
   try {
     const { id } = await ctx.params;
     await getStore().remove(id);
+    after(syncSheet);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Delete failed";

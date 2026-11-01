@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Taylor — Resume AI",
+  "version": "0.1.0",
+  "description": "Tailor your LaTeX resume to the job posting you're viewing. Requires the Taylor app running locally.",
+  "minimum_chrome_version": "121",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "taylor-resume-ai@local-app",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["websiteContent", "authenticationInfo"]
+      }
+    }
+  },
+  "action": {
+    "default_title": "Open Taylor"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "sidebar_action": {
+    "default_title": "Taylor",
+    "default_panel": "sidepanel.html",
+    "default_icon": "icons/icon48.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "permissions": ["sidePanel", "scripting"],
+  "host_permissions": ["http://localhost:3000/*"],
+  "optional_host_permissions": ["<all_urls>"]
+}

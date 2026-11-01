@@ -1,5 +1,5 @@
 import { runTailorCascade } from "@/lib/agents/cascade";
-import { isDemoMode } from "@/lib/gemini/client";
+import { isDemoMode } from "@/lib/llm/client";
 import { KeywordExtractSchema, TailorControlsSchema } from "@/lib/types";
 import { z } from "zod";
 

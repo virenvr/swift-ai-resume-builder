@@ -7,7 +7,14 @@ import { stripResumePrefix } from "@/lib/latex/filenames";
 import { guessHighlightTerm } from "@/lib/workbench/changeHighlight";
 import Link from "next/link";
 import { downloadExportPack } from "@/lib/workbench/exportPack";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import type {
   AggressiveCoverageTarget,
   AtsScore,
@@ -29,6 +36,7 @@ import {
 } from "@/lib/types";
 import {
   DEFAULT_RESUME_TYPE,
+  isRoleMappedResumeType,
   resumeTypeFromRoleFamily,
   resumeTypeLabel,
 } from "@/lib/resume/resumeTypeShared";
@@ -105,6 +113,52 @@ function emptyCascadeSteps(): CascadeStepResult[] {
   }));
 }
 
+const RESUME_CHOICE_KEY = "taylor.resumeType";
+
+function rememberResumeType(type: string) {
+  try {
+    localStorage.setItem(RESUME_CHOICE_KEY, type);
+  } catch {
+    // Storage can be blocked. The choice just won't outlast this page.
+  }
+}
+
+/** The type the user last chose, if it still exists. */
+function rememberedResumeType(types: ResumeTypeInfo[]): string | null {
+  try {
+    const saved = localStorage.getItem(RESUME_CHOICE_KEY);
+    return saved && types.some((t) => t.type === saved) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Controls after applying parse suggestions: roleFamily → resumeType, but only if that
+ * archetype exists and the user hasn't picked a custom one, such as an uploaded resume.
+ */
+function controlsFromSuggestions(
+  prev: typeof DEFAULT_CONTROLS,
+  s: JdSuggestions,
+  types: ResumeTypeInfo[],
+): typeof DEFAULT_CONTROLS {
+  const detectedType = resumeTypeFromRoleFamily(s.roleFamily);
+  const typeExists =
+    isRoleMappedResumeType(prev.resumeType) &&
+    types.some((t) => t.type === detectedType);
+  return {
+    ...prev,
+    roleFamily: s.roleFamily,
+    location: s.location || prev.location,
+    seniority: s.seniority,
+    workArrangement: s.workArrangement,
+    resumeType: typeExists ? detectedType : prev.resumeType,
+  };
+}
+
+// Chromium browsers, Firefox, and Safari respectively.
+const EXTENSION_ORIGIN = /^(chrome|moz|safari-web)-extension:\/\//;
+
 export function Workbench() {
   const [jdText, setJdText] = useState("");
   const [jdUrl, setJdUrl] = useState("");
@@ -132,6 +186,10 @@ export function Workbench() {
   );
   const [error, setError] = useState<string | null>(null);
   const [statusNote, setStatusNote] = useState<string | null>(null);
+  const [extensionOrigin, setExtensionOrigin] = useState<string | null>(null);
+  // Set synchronously: two requests can arrive before busy state re-renders.
+  const creatingResume = useRef(false);
+  const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<
     "parse" | "tailor" | "metadata" | "revert" | "applying" | null
@@ -149,7 +207,7 @@ export function Workbench() {
   const [exportBusy, setExportBusy] = useState(false);
   const [availableTypes, setAvailableTypes] = useState<ResumeTypeInfo[]>([]);
 
-  const refreshResumeTypes = useCallback(async () => {
+  const refreshResumeTypes = useCallback(async (): Promise<ResumeTypeInfo[]> => {
     try {
       const res = await fetch("/api/resume-types");
       const data = (await res.json()) as {
@@ -158,30 +216,28 @@ export function Workbench() {
       };
       if (data.ok && Array.isArray(data.types)) {
         setAvailableTypes(data.types);
+        return data.types;
       }
     } catch {
       // Non-fatal: dropdown falls back to the default type.
     }
+    return [];
   }, []);
 
   useEffect(() => {
-    void refreshResumeTypes();
+    void refreshResumeTypes().then((types) => {
+      const saved = rememberedResumeType(types);
+      if (saved) setControls((c) => ({ ...c, resumeType: saved }));
+    });
   }, [refreshResumeTypes]);
 
-  function applyControlsFromSuggestions(s: JdSuggestions) {
+  function applyControlsFromSuggestions(
+    s: JdSuggestions,
+    types: ResumeTypeInfo[] = availableTypes,
+  ) {
     setSuggestions(s);
     setCompanyName(s.company ?? "");
-    // Deterministic roleFamily → resumeType, but only if that archetype exists.
-    const detectedType = resumeTypeFromRoleFamily(s.roleFamily);
-    const typeExists = availableTypes.some((t) => t.type === detectedType);
-    setControls((prev) => ({
-      ...prev,
-      roleFamily: s.roleFamily,
-      location: s.location || prev.location,
-      seniority: s.seniority,
-      workArrangement: s.workArrangement,
-      resumeType: typeExists ? detectedType : prev.resumeType,
-    }));
+    setControls((prev) => controlsFromSuggestions(prev, s, types));
     setPendingSuggestions(null);
     setParseBannerDismissed(true);
   }
@@ -212,7 +268,11 @@ export function Workbench() {
     });
   }
 
-  async function runParse(textOverride?: string, urlOverride?: string) {
+  async function runParse(
+    textOverride?: string,
+    urlOverride?: string,
+    autoApply = false,
+  ): Promise<ParseResponse | null> {
     const paste = (textOverride ?? jdText).trim();
     const url = (urlOverride ?? jdUrl).trim();
     setError(null);
@@ -249,8 +309,9 @@ export function Workbench() {
       startTransition(() => {
         if (data.jdText) setJdText(data.jdText);
         setSuggestions(data.suggestions!);
-        setPendingSuggestions(data.suggestions!);
+        if (!autoApply) setPendingSuggestions(data.suggestions!);
         if (data.keywords) setKeywords(data.keywords);
+        if (autoApply) return;
         const sourceNote =
           data.source === "url"
             ? "Fetched JD from URL, then parsed."
@@ -263,8 +324,10 @@ export function Workbench() {
         const warn = data.warning ? ` ${data.warning}` : "";
         setStatusNote(`${sourceNote}${demoNote}${warn}`);
       });
+      return data;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Parse failed");
+      return null;
     } finally {
       setBusy(null);
     }
@@ -415,9 +478,27 @@ export function Workbench() {
     setPdfToastOpen(true);
   }, [cascadeDone, pdfUrl, steps]);
 
-  async function onTailor() {
+  function onTailor() {
+    return runCascade({
+      jdText,
+      controls,
+      companyName,
+      keywords,
+      types: availableTypes,
+    });
+  }
+
+  async function runCascade(input: {
+    jdText: string;
+    controls: typeof DEFAULT_CONTROLS;
+    companyName: string;
+    keywords: KeywordExtract | null;
+    types: ResumeTypeInfo[];
+  }) {
     setError(null);
-    const selected = availableTypes.find((t) => t.type === controls.resumeType);
+    const selected = input.types.find(
+      (t) => t.type === input.controls.resumeType,
+    );
     if (selected && !selected.hasMaster) {
       setError(
         `Resume type "${selected.label}" (${selected.type}) has no master_resume_${selected.type}.json yet. Click Make MetaData first (builds metadata for every template_*.tex), then run the cascade.`,
@@ -446,10 +527,10 @@ export function Workbench() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          jdText,
-          controls,
-          companyName: companyName.trim() || "Company",
-          keywords: keywords ?? undefined,
+          jdText: input.jdText,
+          controls: input.controls,
+          companyName: input.companyName.trim() || "Company",
+          keywords: input.keywords ?? undefined,
           stream: true,
         }),
       });
@@ -529,6 +610,120 @@ export function Workbench() {
       setBusy(null);
     }
   }
+
+  /**
+   * One-click flow for the Chrome extension: parse the JD, apply the suggestions,
+   * and run the cascade. Passes values directly because state set here can't be
+   * read until the next render.
+   */
+  async function createResumeFromJd(text: string, url: string) {
+    creatingResume.current = true;
+    try {
+      setJdText(text);
+      setJdUrl(url);
+      setStatusNote("Reading the job posting…");
+      const [types, parsed] = await Promise.all([
+        refreshResumeTypes(),
+        runParse(text, url, true),
+      ]);
+      if (!parsed?.suggestions) return;
+
+      // A job handed over as the page loads can arrive before the saved choice is restored.
+      const current = {
+        ...controls,
+        resumeType: rememberedResumeType(types) ?? controls.resumeType,
+      };
+      const next = controlsFromSuggestions(current, parsed.suggestions, types);
+      setControls(next);
+      await runCascade({
+        jdText: parsed.jdText ?? text,
+        controls: next,
+        companyName: parsed.suggestions.company ?? "",
+        keywords: parsed.keywords ?? null,
+        types,
+      });
+    } finally {
+      creatingResume.current = false;
+    }
+  }
+
+  const onExtensionJd = useEffectEvent(
+    (jd: { jdText: string; jdUrl: string; autoRun: boolean }) => {
+      if (!jd.autoRun) {
+        setJdText(jd.jdText);
+        setJdUrl(jd.jdUrl);
+        setError(null);
+        setStatusNote(
+          "Pulled the JD from your tab. Trim anything extra, then Parse.",
+        );
+      } else if (busy === null && !creatingResume.current) {
+        void createResumeFromJd(jd.jdText, jd.jdUrl);
+      }
+    },
+  );
+
+  const onExtensionUpload = useEffectEvent((resumeType: string) => {
+    rememberResumeType(resumeType);
+    void refreshResumeTypes();
+    setControls((c) => ({ ...c, resumeType }));
+  });
+
+  // Browser extension panel (extension/) hands over the JD from the active tab.
+  useEffect(() => {
+    if (window.parent === window) return;
+
+    function onMessage(event: MessageEvent) {
+      if (
+        event.source !== window.parent ||
+        !EXTENSION_ORIGIN.test(event.origin)
+      ) {
+        return;
+      }
+      if (event.data?.type === "taylor:hello") {
+        setExtensionOrigin(event.origin);
+        return;
+      }
+      if (
+        event.data?.type === "taylor:resume-uploaded" &&
+        typeof event.data.resumeType === "string"
+      ) {
+        onExtensionUpload(event.data.resumeType);
+        return;
+      }
+      if (
+        event.data?.type !== "taylor:jd" ||
+        typeof event.data.jdText !== "string"
+      ) {
+        return;
+      }
+      onExtensionJd({
+        jdText: event.data.jdText,
+        jdUrl: typeof event.data.jdUrl === "string" ? event.data.jdUrl : "",
+        autoRun: event.data.autoRun === true,
+      });
+    }
+
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage({ type: "taylor:ready" }, "*");
+    return () => {
+      window.removeEventListener("message", onMessage);
+      window.parent.postMessage({ type: "taylor:unready" }, "*");
+    };
+  }, []);
+
+  // Results sit below the fold in the narrow panel, so report progress to it.
+  useEffect(() => {
+    if (!extensionOrigin) return;
+    window.parent.postMessage(
+      {
+        type: "taylor:status",
+        text: error ?? statusNote,
+        busy: busy !== null,
+        pdfUrl: cascadeDone && !error ? pdfUrl : null,
+      },
+      extensionOrigin,
+    );
+  }, [extensionOrigin, error, statusNote, busy, cascadeDone, pdfUrl]);
 
   async function onOpenLatexEditor() {
     setError(null);
@@ -663,11 +858,7 @@ export function Workbench() {
   }
 
   async function onRevertTex() {
-    const ok = window.confirm(
-      "Revert the working TeX to the baseline masters?\n\nThis rebuilds MetaData for ALL resume types, deletes current Resume_* artifacts, and clears the tailored editor state. The editor reloads the selected type's baseline. Your data/template_*.tex files are never touched.",
-    );
-    if (!ok) return;
-
+    setRevertConfirmOpen(false);
     setError(null);
     setBusy("revert");
     try {
@@ -763,7 +954,7 @@ export function Workbench() {
           </Link>
           <button
             type="button"
-            onClick={onRevertTex}
+            onClick={() => setRevertConfirmOpen(true)}
             disabled={!canRevert}
             title="Reset the working TeX to the baseline masters, rebuild MetaData for ALL resume types, and clear tailored artifacts. Your data/template_*.tex files stay untouched."
             className="btn-ghost"
@@ -781,6 +972,35 @@ export function Workbench() {
           </button>
         </div>
       </header>
+
+      {revertConfirmOpen ? (
+        <div role="alertdialog" aria-label="Confirm revert" className="panel mb-5 space-y-3 p-5">
+          <p className="text-sm text-[var(--ink)]">
+            <strong>Revert the working TeX to the baseline masters?</strong> This
+            rebuilds MetaData for ALL resume types, deletes current Resume_*
+            artifacts, and clears the tailored editor state. The editor reloads
+            the selected type&apos;s baseline. Your data/template_*.tex files are
+            never touched.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onRevertTex}
+              disabled={!canRevert}
+              className="btn-primary"
+            >
+              Revert
+            </button>
+            <button
+              type="button"
+              onClick={() => setRevertConfirmOpen(false)}
+              className="btn-ghost"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
         {/* Left: JD intake */}
@@ -992,12 +1212,13 @@ export function Workbench() {
             <Field label="Resume type">
               <select
                 value={controls.resumeType}
-                onChange={(e) =>
+                onChange={(e) => {
+                  rememberResumeType(e.target.value);
                   setControls((c) => ({
                     ...c,
                     resumeType: e.target.value,
-                  }))
-                }
+                  }));
+                }}
                 className="field"
               >
                 {(availableTypes.length

@@ -1,6 +1,6 @@
 /**
  * Multi-agent cascade prompts.
- * Keep succinct; each agent returns JSON only (caller sets responseMimeType).
+ * Keep succinct; each agent returns JSON only (parsed by generateJson).
  */
 
 export const PROMPT_PLACEHOLDERS = {
