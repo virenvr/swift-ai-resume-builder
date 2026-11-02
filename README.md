@@ -1,4 +1,4 @@
-# Taylor — Resume AI
+# swift-taylor — Resume AI
 
 A local-first web app that tailors your **LaTeX resume to each job description** for
 better ATS keyword alignment. Paste a JD (or a public job URL), pick how aggressive you
@@ -6,7 +6,7 @@ want to be, and it runs a cascade of agents — extract keywords → gap analysi
 LaTeX compile → hard one-page gate → ATS coverage score → "what changed" summary — then
 hands you a compiled, single-page PDF plus the editable `.tex`.
 
-Meet **Taylor** (yes, a pun on _tailor_), the friendly assistant that drives the UI.
+Meet **swift-taylor** (yes, a pun on _tailor_), the friendly assistant that drives the UI.
 
 > **Runs on your machine.** Your files stay local, but when AI is on, the JD and your resume
 > content go to the AI provider you choose. Use a local model or **Demo mode** to avoid that.
@@ -17,11 +17,11 @@ Meet **Taylor** (yes, a pun on _tailor_), the friendly assistant that drives the
 
 **Landing page** — a clean slate, ready for a job description.
 
-![Taylor landing page](images/taylor-ai-home.png)
+![swift-taylor landing page](images/swift-taylor-ai-home.png)
 
-**Taylor in action** — fields filled in, tailoring a resume to the pasted JD.
+**swift-taylor in action** — fields filled in, tailoring a resume to the pasted JD.
 
-![Taylor in action](images/taylor-ai-in-action.png)
+![swift-taylor in action](images/swift-taylor-ai-in-action.png)
 
 ---
 
@@ -45,6 +45,10 @@ Meet **Taylor** (yes, a pun on _tailor_), the friendly assistant that drives the
 
 ## Prerequisites
 
+`bash scripts/install.sh` (macOS/Linux) or `scripts\install.ps1` (Windows) — see
+[Quick start](#quick-start) — installs the first two of these for you if they're missing.
+Doing it yourself instead, you'll need:
+
 1. **Node.js 20 or newer** — check with `node --version`.
 2. **Tectonic** (the LaTeX engine used to compile PDFs). This is **required to generate
    PDFs** — the app starts and runs without it, but any compile step will fail until it's
@@ -60,16 +64,28 @@ Meet **Taylor** (yes, a pun on _tailor_), the friendly assistant that drives the
 git clone <your-repo-url>
 cd Tailor_Resume_AI
 
-# 1. install deps
-npm install
+# macOS / Linux
+bash scripts/install.sh
+```
 
-# 2. set up env
-cp .env.example .env.local      # Windows PowerShell: copy .env.example .env.local
-#   then edit .env.local (see "Configuration" below)
+```powershell
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+```
 
-# 3. install the LaTeX engine (see "Installing Tectonic")
+That one command checks for **Node 20+** and installs it if it's missing (via Homebrew or
+nvm on macOS/Linux, winget on Windows — wiring up `PATH` so it's usable right away), then
+installs the npm dependencies, creates `.env.local` from `.env.example` (if it doesn't
+already exist), and tries to install Tectonic for you (Homebrew on macOS, winget on
+Windows). If any auto-install step isn't possible on your system — no Homebrew/nvm/winget
+found, or you're on an OS it doesn't recognize — it tells you exactly what to install
+yourself and points at the relevant section below; everything else still runs.
 
-# 4. run
+Already have Node 20+? `npm run setup` does everything except the Node step.
+
+Then:
+
+```bash
 npm run dev
 ```
 
@@ -78,19 +94,37 @@ Open [http://localhost:3000](http://localhost:3000).
 Out of the box, `DEMO_MODE=true` means you can click around and run the cascade with
 mocked AI immediately. To get a real compiled PDF you still need Tectonic installed.
 
+<details>
+<summary>Manual setup (what the install scripts do, step by step)</summary>
+
+```bash
+# 0. install Node 20+ if you don't have it: https://nodejs.org
+
+# 1. install deps
+npm install
+
+# 2. set up env
+cp .env.example .env.local      # Windows PowerShell: copy .env.example .env.local
+#   then edit .env.local (see "Configuration" below)
+
+# 3. install the LaTeX engine (see "Installing Tectonic")
+```
+
+</details>
+
 ---
 
 ## Example walkthrough:
 
-1. **Install** Node 20+, then Tectonic ([Installing Tectonic](#installing-tectonic)).
-2. **Clone →** `npm install` → copy `.env.example` to `.env.local`.
-3. Set `NEXT_PUBLIC_RESUME_OWNER_NAME` to your name. Optionally set `LLM_PROVIDER`, add that provider's key, and set `DEMO_MODE=false` for real AI (otherwise explore in demo mode).
-4. **Put your resume in** — replace `data/template_ml.tex` (importantly, keep the section markers like `SKILLS_START` / `EXPERIENCE_START`). Optional: add `template_ds.tex` / `template_swe.tex` for other archetypes.
-5. Run `npm run dev` → open [http://localhost:3000](http://localhost:3000).
-6. Click **Make MetaData** — builds `master_resume_<type>.json` for every `template_*.tex`. Check the per-type results panel (✓ / ✗). Do this once whenever you change a template.
-7. Paste a JD (or a public job URL) → **Parse** — controls prefill; **Resume type** auto-picks when a matching archetype exists (`data_science→ds`, `ml→ml`, `swe→swe`, else `ml`).
-8. Pick a mode → **Run cascade** → wait for the PDF / “what changed”.
-9. Happy with it? Click **I Applied ✓** → open **My Applications** (`/applications`) to see the row, expandable trace, and (once you have apps) the pace analytics strip.
+1. **Clone →** `bash scripts/install.sh` (macOS/Linux) or `scripts\install.ps1` (Windows) —
+   one command: installs Node 20+ if needed, deps, `.env.local`, and tries to install Tectonic.
+2. Set `NEXT_PUBLIC_RESUME_OWNER_NAME` to your name. Optionally set `LLM_PROVIDER`, add that provider's key, and set `DEMO_MODE=false` for real AI (otherwise explore in demo mode).
+3. **Put your resume in** — replace `data/template_ml.tex` (importantly, keep the section markers like `SKILLS_START` / `EXPERIENCE_START`). Optional: add `template_ds.tex` / `template_swe.tex` for other archetypes.
+4. Run `npm run dev` → open [http://localhost:3000](http://localhost:3000).
+5. Click **Make MetaData** — builds `master_resume_<type>.json` for every `template_*.tex`. Check the per-type results panel (✓ / ✗). Do this once whenever you change a template.
+6. Paste a JD (or a public job URL) → **Parse** — controls prefill; **Resume type** auto-picks when a matching archetype exists (`data_science→ds`, `ml→ml`, `swe→swe`, else `ml`).
+7. Pick a mode → **Run cascade** → wait for the PDF / “what changed”.
+8. Happy with it? Click **I Applied ✓** → open **My Applications** (`/applications`) to see the row, expandable trace, and (once you have apps) the pace analytics strip.
 
 **If something fails**
 
@@ -149,7 +183,7 @@ tectonic --version
 
 ## Browser extension
 
-The `extension/` folder runs Taylor next to the job posting you're reading. It's a front end
+The `extension/` folder runs swift-taylor next to the job posting you're reading. It's a front end
 for the local app, because tailoring and PDF compiles need Node, Tectonic, and your `data/`
 folder — so `npm run dev` must be running on port 3000. That's also why it needs a desktop
 browser: phones and tablets can't reach the app on `localhost`.
@@ -173,18 +207,18 @@ Start the app with `npm run dev`, then:
   [addons.mozilla.org](https://extensionworkshop.com/documentation/publish/signing-and-distribution-overview/).
 - **Safari:** needs Xcode. Run the command below, set your team under **Signing & Capabilities**,
   and run the app. Then turn on **Allow Unsigned Extensions** in Safari's Developer settings and
-  enable Taylor under **Settings > Extensions**.
+  enable swift-taylor under **Settings > Extensions**.
 
   ```bash
-  xcrun safari-web-extension-converter extension --project-location build/safari --app-name Taylor --macos-only
+  xcrun safari-web-extension-converter extension --project-location build/safari --app-name swift-taylor --macos-only
   ```
 
-Click the Taylor toolbar icon to open it. Pin the icon first if your browser hides it.
+Click the swift-taylor toolbar icon to open it. Pin the icon first if your browser hides it.
 
 **Log in to an AI provider (optional)**
 
 Click **AI login**, pick a provider, and paste your API key. Choose **Other** for OpenRouter,
-Groq, Ollama, or any service with an OpenAI-style API. Taylor makes one small real call to check
+Groq, Ollama, or any service with an OpenAI-style API. swift-taylor makes one small real call to check
 the key, which costs a tiny amount of credit, then uses that provider for everything, including
 when you open the app in a tab. **Log out** returns to `.env.local`.
 
@@ -199,14 +233,14 @@ when you open the app in a tab. **Log out** returns to `.env.local`.
 **Upload a resume (optional)**
 
 Click **Upload resume**, choose **New resume** or an existing one to replace, and pick your file.
-Taylor saves it as `data/template_<name>.tex`, reads it with **Make MetaData** (one AI call), and
+swift-taylor saves it as `data/template_<name>.tex`, reads it with **Make MetaData** (one AI call), and
 selects it.
 
 - **LaTeX only.** Tailoring edits your `.tex` source directly, so PDF and Word files can't be used.
   The file must include `% === SKILLS_START ===` / `% === SKILLS_END ===` and
   `% === EXPERIENCE_START ===` / `% === EXPERIENCE_END ===` around those sections, or it's refused.
 - **A new resume stays selected** until you pick another, for every job. Replacing Machine Learning,
-  Data Science, or Software Engineering keeps the usual behaviour: Taylor switches among those three
+  Data Science, or Software Engineering keeps the usual behaviour: swift-taylor switches among those three
   by job type, so the sample resumes can still be used unless you replace all three.
 - **Replacing** keeps one backup of the old resume at `data/template_<name>.backup.tex` and
   `data/master_resume_<name>.backup.json`.
@@ -232,23 +266,23 @@ Each person needs their own Google OAuth client, once:
    restart the app.
 
 Then click **Google Sheet > Log in with Google** in the extension, go back to the panel, paste the
-link to a Google Sheet you can edit, and click **Use this sheet**. Taylor fills it with the
+link to a Google Sheet you can edit, and click **Use this sheet**. swift-taylor fills it with the
 applications you've already saved.
 
-- **Your existing data is safe.** Taylor writes to the tab in your link only if columns A to L are
-  empty or already hold Taylor's header. Otherwise it adds a **Taylor Applications** tab and leaves
+- **Your existing data is safe.** swift-taylor writes to the tab in your link only if columns A to L are
+  empty or already hold swift-taylor's header. Otherwise it adds a **swift-taylor Applications** tab and leaves
   your tabs alone.
 - **The app is the source of truth.** Saving or updating an application changes its row, and this
-  runs whether you use the extension or a tab. Edits to Taylor's columns in the sheet are overwritten
+  runs whether you use the extension or a tab. Edits to swift-taylor's columns in the sheet are overwritten
   by the next sync, and rows you delete from the sheet come back if the application is still in the
   app. Add your own columns to the right of **ID**: they're kept, and you can sort and rename the
   tab freely.
-- **Taylor never deletes rows.** Deleting an application in the app leaves its row in the sheet as
+- **swift-taylor never deletes rows.** Deleting an application in the app leaves its row in the sheet as
   history, though it stops updating. Remove the row yourself if you don't want it.
-- **If you change the header row or insert a column** among Taylor's, syncing stops and the panel
+- **If you change the header row or insert a column** among swift-taylor's, syncing stops and the panel
   says why, so nothing gets overwritten. Restore the header to carry on.
 - **If a sync fails,** the panel shows why and the next sync catches up. **Sync now** retries.
-- **Access:** Google has no narrower permission for a sheet you link, so the login lets Taylor read
+- **Access:** Google has no narrower permission for a sheet you link, so the login lets swift-taylor read
   and edit **all of your Google Sheets**. It only ever opens the one you link, and it can't reach
   your other Drive files.
 - **Where the login goes:** the refresh token is saved in plain text in `.google-login.json` in the
@@ -260,10 +294,13 @@ applications you've already saved.
 Open a job posting, then choose one:
 
 - **Create resume** reads the job and builds the tailored PDF in one click, with no copy and
-  paste. The panel shows progress and an **Open PDF** link when it's done. It uses the mode set
-  in the app (Middle Ground by default) and never submits anything to the job site.
+  paste. It calls the local API directly from the panel (`/api/parse`, `/api/resume-types`,
+  `/api/tailor`) — no localhost tab opens, and the panel's own progress text tracks the cascade.
+  The embedded app only gets involved afterward, to show the result, so **Open PDF**,
+  **View Raw LaTeX**, and **I Applied ✓** all work on it as usual. It uses Middle Ground mode
+  and never submits anything to the job site.
 - **Use this page** only fills in **Job input**, so you can review it and adjust the controls
-  before running the cascade yourself.
+  before running the cascade yourself (this one still goes through the embedded app).
 
 Both read the text you've selected if there is any, otherwise the job description on the page.
 **Create resume** stops without using AI credits if the page doesn't look like a job posting.
@@ -363,7 +400,7 @@ See [MultiMaster.MD](./MultiMaster.MD) for the design.
 ### Application tracker
 
 After a cascade you’re happy with, click **I Applied ✓**.
-Taylor saves a local record under `data/applications/`:
+swift-taylor saves a local record under `data/applications/`:
 company, role, mode, resume type, keywords, ATS coverage, “what changed”, and the tailored
 `.tex` source. Open **My Applications** to browse the table, re-download/compile past TeX,
 and check pace analytics. See [Tracker.MD](./Tracker.MD) for the schema and adapter plan.
@@ -414,6 +451,9 @@ the full design.
 ## Scripts
 
 ```bash
+bash scripts/install.sh    # one-time (macOS/Linux): install Node if needed, then everything below
+scripts\install.ps1        # one-time (Windows): same, via PowerShell
+npm run setup   # one-time: install deps, create .env.local, install Tectonic if possible — skips the Node check
 npm run dev     # start the dev server
 npm run build   # production build
 npm run start   # serve the production build

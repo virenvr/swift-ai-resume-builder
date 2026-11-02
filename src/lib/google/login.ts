@@ -10,7 +10,7 @@ const LOGIN_PATH = path.join(process.cwd(), ".google-login.json");
 const REDIRECT_URI = "http://localhost:3000/api/google-login/callback";
 
 // Opening a sheet from a pasted link needs the full spreadsheets scope: Google has no
-// narrower one for a sheet Taylor didn't create. It doesn't cover other Drive files.
+// narrower one for a sheet swift-taylor didn't create. It doesn't cover other Drive files.
 const SCOPES = "openid email https://www.googleapis.com/auth/spreadsheets";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";

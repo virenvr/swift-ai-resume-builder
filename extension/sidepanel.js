@@ -5,7 +5,11 @@ const APP_ORIGIN = new URL(APP_URL).origin;
 const LOGIN_URL = new URL("api/llm-login", APP_URL).href;
 const GOOGLE_URL = new URL("api/google-login", APP_URL).href;
 const UPLOAD_URL = new URL("api/resume/upload", APP_URL).href;
+const PARSE_URL = new URL("api/parse", APP_URL).href;
+const RESUME_TYPES_URL = new URL("api/resume-types", APP_URL).href;
+const TAILOR_URL = new URL("api/tailor", APP_URL).href;
 const NEW_RESUME = "";
+const DEFAULT_RESUME_TYPE = "ml";
 const GOOGLE_POLL_MS = 2_000;
 const GOOGLE_POLL_LIMIT_MS = 5 * 60_000;
 
@@ -64,8 +68,10 @@ const uploadSubmit = document.getElementById("upload-submit");
 // True while the Workbench is mounted in the frame and listening for a JD.
 let workbenchReady = false;
 let pendingJd = null;
+let pendingCascadeResult = null;
 let isOffline = false;
 let isReading = false;
+let isRunning = false;
 let appBusy = false;
 let isLoggingIn = false;
 let googlePoll = null;
@@ -73,7 +79,7 @@ let isUploading = false;
 let pendingUpload = null;
 
 function syncButtons() {
-  const disabled = isOffline || isReading || appBusy || isLoggingIn || isUploading;
+  const disabled = isOffline || isReading || isRunning || appBusy || isLoggingIn || isUploading;
   create.disabled = disabled;
   grab.disabled = disabled;
   aiButton.disabled = isOffline;
@@ -136,8 +142,8 @@ function showLoginState({ login, demoMode }) {
     syncProviderFields();
   } else {
     loginStatus.textContent = demoMode
-      ? "Not logged in. Taylor is using demo data, not real AI."
-      : "Not logged in. Taylor is using the settings in .env.local.";
+      ? "Not logged in. swift-taylor is using demo data, not real AI."
+      : "Not logged in. swift-taylor is using the settings in .env.local.";
   }
 }
 
@@ -308,7 +314,7 @@ async function refreshResumeTypes() {
 
 function sendUploadToApp(resumeType) {
   if (workbenchReady) {
-    frame.contentWindow.postMessage({ type: "taylor:resume-uploaded", resumeType }, APP_ORIGIN);
+    frame.contentWindow.postMessage({ type: "swift-taylor:resume-uploaded", resumeType }, APP_ORIGIN);
   } else {
     pendingUpload = resumeType;
   }
@@ -318,7 +324,7 @@ async function uploadResume(event) {
   event.preventDefault();
   const [file] = uploadFile.files;
   if (!file.name.toLowerCase().endsWith(".tex")) {
-    uploadStatus.textContent = "Taylor can only tailor LaTeX, so choose a .tex file.";
+    uploadStatus.textContent = "swift-taylor can only tailor LaTeX, so choose a .tex file.";
     return;
   }
   isUploading = true;
@@ -436,7 +442,7 @@ async function readJobFromActiveTab() {
   // Must be the first await: Chrome requires a user gesture for this prompt.
   const granted = await api.permissions.request({ origins: ["<all_urls>"] });
   if (!granted) {
-    showNotice("Taylor needs site access to read job postings. You can still paste the JD below.");
+    showNotice("swift-taylor needs site access to read job postings. You can still paste the JD below.");
     return null;
   }
 
@@ -479,10 +485,148 @@ function sendJdToApp(jd) {
   }
 }
 
+/** Hands a finished cascade to the Workbench so Open PDF / View Raw LaTeX / I Applied
+ *  work on it, without the app re-running anything — the panel already ran it. */
+function sendCascadeResultToApp(result) {
+  const payload = { type: "swift-taylor:cascade-result", ...result };
+  if (workbenchReady) {
+    frame.contentWindow.postMessage(payload, APP_ORIGIN);
+  } else {
+    pendingCascadeResult = payload;
+    frame.src = APP_URL;
+  }
+}
+
 /** Fills in Job input for review. */
 async function useThisPage() {
   const job = await readJobFromActiveTab();
-  if (job) sendJdToApp({ type: "taylor:jd", jdText: job.jdText, jdUrl: job.jdUrl });
+  if (job) sendJdToApp({ type: "swift-taylor:jd", jdText: job.jdText, jdUrl: job.jdUrl });
+}
+
+async function postJson(url, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.ok) throw new Error(data?.error || "Request failed");
+  return data;
+}
+
+// Deterministic role-family -> resume-type mapping, mirroring resumeTypeFromRoleFamily
+// in src/lib/resume/resumeTypeShared.ts (duplicated here: the extension is plain JS and
+// can't import the app's TS modules).
+function resumeTypeFromRoleFamily(roleFamily) {
+  if (roleFamily === "ml") return "ml";
+  if (roleFamily === "data_science") return "ds";
+  if (roleFamily === "swe") return "swe";
+  return DEFAULT_RESUME_TYPE;
+}
+
+/**
+ * Runs parse + the full tailoring cascade via direct fetch() calls to the local API —
+ * no localhost tab, and the iframe isn't needed until there's a result to show in it.
+ */
+async function runCascadeDirect(jdText, jdUrl) {
+  isRunning = true;
+  syncButtons();
+  showNotice("Reading the job posting…");
+  try {
+    const [typesData, parsed] = await Promise.all([
+      fetch(RESUME_TYPES_URL).then((res) => res.json()),
+      postJson(PARSE_URL, { jdText, jdUrl: jdUrl || undefined }),
+    ]);
+    const types = typesData?.ok && Array.isArray(typesData.types) ? typesData.types : [];
+    const s = parsed.suggestions;
+
+    const detected = resumeTypeFromRoleFamily(s.roleFamily);
+    const resumeType = types.some((t) => t.type === detected) ? detected : DEFAULT_RESUME_TYPE;
+    const controls = {
+      mode: "middle_ground",
+      roleFamily: s.roleFamily,
+      location: s.location || "",
+      seniority: s.seniority,
+      workArrangement: s.workArrangement,
+      aggressiveCoverageTarget: 0.8,
+      pinnedKeywords: [],
+      forceInjectKeywords: [],
+      resumeType,
+    };
+    const companyName = s.company || "Company";
+    const resolvedJdText = parsed.jdText ?? jdText;
+
+    showNotice("Tailoring your resume…");
+    const res = await fetch(TAILOR_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jdText: resolvedJdText,
+        controls,
+        companyName,
+        keywords: parsed.keywords ?? undefined,
+        stream: true,
+      }),
+    });
+    if (!res.ok || !res.body) {
+      const fail = await res.json().catch(() => null);
+      throw new Error(fail?.error || "Cascade failed");
+    }
+
+    const steps = [];
+    let result = null;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let event;
+        try {
+          event = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (event.type === "step_start") {
+          showNotice(`Working: ${event.step.label} — ${event.step.summary}`);
+        } else if (event.type === "step_done") {
+          steps.push(event.step);
+        } else if (event.type === "done") {
+          result = event;
+        } else if (event.type === "error") {
+          throw new Error(event.error);
+        }
+      }
+    }
+    if (!result) throw new Error("Cascade ended without a result");
+
+    showNotice(result.usedDemo ? "Done (demo/mocks mixed in)." : "Done.", result.pdfUrl ?? null);
+    sendCascadeResultToApp({
+      jdText: resolvedJdText,
+      jdUrl: jdUrl || "",
+      companyName,
+      controls,
+      suggestions: s,
+      keywords: parsed.keywords ?? null,
+      steps,
+      changeSummary: result.changeSummary ?? null,
+      pdfUrl: result.pdfUrl ?? null,
+      pdfFilename: result.pdfFilename ?? null,
+      texFilename: result.texFilename ?? null,
+      texSource: result.texSource ?? "",
+      usedDemo: result.usedDemo === true,
+    });
+  } catch (error) {
+    showNotice(`Couldn't build a resume: ${error.message}`);
+  } finally {
+    isRunning = false;
+    syncButtons();
+  }
 }
 
 /** Reads the job on screen and builds a tailored resume with no further input. */
@@ -493,27 +637,30 @@ async function createResumeFromScreen() {
     showNotice("This doesn't look like a job posting. Select the job text on the page, then try again.");
     return;
   }
-  showNotice("Reading the job posting…");
-  sendJdToApp({ type: "taylor:jd", jdText: job.jdText, jdUrl: job.jdUrl, autoRun: true });
+  await runCascadeDirect(job.jdText, job.jdUrl);
 }
 
 window.addEventListener("message", (event) => {
   if (event.source !== frame.contentWindow || event.origin !== APP_ORIGIN) return;
-  if (event.data?.type === "taylor:unready") workbenchReady = false;
-  if (event.data?.type === "taylor:ready") {
+  if (event.data?.type === "swift-taylor:unready") workbenchReady = false;
+  if (event.data?.type === "swift-taylor:ready") {
     workbenchReady = true;
     // Tells the app which extension origin to send its status to.
-    frame.contentWindow.postMessage({ type: "taylor:hello" }, APP_ORIGIN);
+    frame.contentWindow.postMessage({ type: "swift-taylor:hello" }, APP_ORIGIN);
     if (pendingJd) {
       frame.contentWindow.postMessage(pendingJd, APP_ORIGIN);
       pendingJd = null;
     }
     if (pendingUpload) {
-      frame.contentWindow.postMessage({ type: "taylor:resume-uploaded", resumeType: pendingUpload }, APP_ORIGIN);
+      frame.contentWindow.postMessage({ type: "swift-taylor:resume-uploaded", resumeType: pendingUpload }, APP_ORIGIN);
       pendingUpload = null;
     }
+    if (pendingCascadeResult) {
+      frame.contentWindow.postMessage(pendingCascadeResult, APP_ORIGIN);
+      pendingCascadeResult = null;
+    }
   }
-  if (event.data?.type === "taylor:status") {
+  if (event.data?.type === "swift-taylor:status") {
     appBusy = event.data.busy === true;
     syncButtons();
     const { text, pdfUrl } = event.data;
@@ -522,7 +669,7 @@ window.addEventListener("message", (event) => {
 });
 
 api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "taylor:focus-panel") return;
+  if (message?.type !== "swift-taylor:focus-panel") return;
   api.windows.getCurrent().then((win) => api.windows.update(win.id, { focused: true }));
   sendResponse(true);
 });

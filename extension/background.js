@@ -4,7 +4,7 @@ const PANEL_URL = api.runtime.getURL("sidepanel.html");
 // For browsers with no sidebar API. An open panel answers and focuses itself.
 async function openPanelWindow() {
   try {
-    if (await api.runtime.sendMessage({ type: "taylor:focus-panel" })) return;
+    if (await api.runtime.sendMessage({ type: "swift-taylor:focus-panel" })) return;
   } catch {
     // Nothing is listening, so no panel is open.
   }

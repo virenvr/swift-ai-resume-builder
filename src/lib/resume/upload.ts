@@ -24,7 +24,7 @@ function checkTemplate(tex: string): void {
   });
   if (missing.length) {
     throw new Error(
-      `Your resume is missing the section markers for ${missing.join(" and ")}. Wrap each section in comments like "% === ${missing[0]}_START ===" and "% === ${missing[0]}_END ===" so Taylor knows what it may edit.`,
+      `Your resume is missing the section markers for ${missing.join(" and ")}. Wrap each section in comments like "% === ${missing[0]}_START ===" and "% === ${missing[0]}_END ===" so swift-taylor knows what it may edit.`,
     );
   }
 }

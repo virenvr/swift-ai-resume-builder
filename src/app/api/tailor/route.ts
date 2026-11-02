@@ -1,6 +1,7 @@
 import { runTailorCascade } from "@/lib/agents/cascade";
 import { isDemoMode } from "@/lib/llm/client";
 import { KeywordExtractSchema, TailorControlsSchema } from "@/lib/types";
+import { corsHeaders, forbidden, getExtensionOrigin } from "@/lib/extensionRequest";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -13,14 +14,36 @@ const BodySchema = z.object({
   stream: z.boolean().optional().default(true),
 });
 
+// Same-origin calls (the Workbench itself) send no Origin header and skip this
+// entirely; only a genuine cross-origin preflight (the extension) reaches here.
+export async function OPTIONS(request: Request) {
+  const origin = getExtensionOrigin(request);
+  if (!origin) return forbidden();
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...corsHeaders(origin),
+      "Access-Control-Allow-Methods": "POST",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
+/**
+ * Runs the tailoring cascade. Called same-origin by the Workbench, and directly
+ * (cross-origin) by the extension's one-click "Create resume".
+ */
 export async function POST(request: Request) {
+  const origin = getExtensionOrigin(request);
+  const extCors = origin ? corsHeaders(origin) : undefined;
+
   let body: z.infer<typeof BodySchema>;
   try {
     body = BodySchema.parse(await request.json());
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Invalid tailor request";
-    return Response.json({ ok: false, error: message }, { status: 400 });
+    return Response.json({ ok: false, error: message }, { status: 400, headers: extCors });
   }
 
   if (!body.stream) {
@@ -31,21 +54,24 @@ export async function POST(request: Request) {
         companyName: body.companyName,
         keywords: body.keywords,
       });
-      return Response.json({
-        ok: true,
-        steps: result.steps,
-        usedDemo: result.usedDemo,
-        demoMode: isDemoMode(),
-        pdfUrl: result.pdfUrl,
-        pdfFilename: result.pdfFilename,
-        texFilename: result.texFilename,
-        texSource: result.texSource,
-        changeSummary: result.changeSummary,
-      });
+      return Response.json(
+        {
+          ok: true,
+          steps: result.steps,
+          usedDemo: result.usedDemo,
+          demoMode: isDemoMode(),
+          pdfUrl: result.pdfUrl,
+          pdfFilename: result.pdfFilename,
+          texFilename: result.texFilename,
+          texSource: result.texSource,
+          changeSummary: result.changeSummary,
+        },
+        { headers: extCors },
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Cascade failed";
-      return Response.json({ ok: false, error: message }, { status: 400 });
+      return Response.json({ ok: false, error: message }, { status: 400, headers: extCors });
     }
   }
 
@@ -80,6 +106,7 @@ export async function POST(request: Request) {
     headers: {
       "Content-Type": "application/x-ndjson; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
+      ...extCors,
     },
   });
 }

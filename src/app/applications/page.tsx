@@ -114,7 +114,7 @@ export default function ApplicationsPage() {
               Refresh
             </button>
             <Link href="/" className="btn-primary" prefetch={false}>
-              Back to Taylor
+              Back to swift-taylor
             </Link>
           </div>
         </header>

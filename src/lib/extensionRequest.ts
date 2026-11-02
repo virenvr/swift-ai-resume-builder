@@ -9,7 +9,7 @@ export function getExtensionOrigin(request: Request): string | null {
 
 export const forbidden = () =>
   Response.json(
-    { ok: false, error: "Only the Taylor extension can use this." },
+    { ok: false, error: "Only the swift-taylor extension can use this." },
     { status: 403 },
   );
 

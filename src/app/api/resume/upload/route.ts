@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     const reason = error instanceof Error ? error.message : "unknown error";
-    message = `Saved ${label}, but Taylor couldn't read it yet (${reason}). Click Make MetaData in the app to try again.`;
+    message = `Saved ${label}, but swift-taylor couldn't read it yet (${reason}). Click Make MetaData in the app to try again.`;
   }
 
   return Response.json(

@@ -8,7 +8,7 @@ import {
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
 // Added to a linked spreadsheet when the tab in the link already holds other data.
-const NEW_TAB_TITLE = "Taylor Applications";
+const NEW_TAB_TITLE = "swift-taylor Applications";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 // Sync finds rows by the ID, so it must stay the last column. Update LAST_COLUMN to match.
@@ -108,12 +108,12 @@ async function readRows(token: string, tab: Tab): Promise<string[][]> {
 const quoteTitle = (tab: Tab) => `'${tab.title.replaceAll("'", "''")}'`;
 
 // Syncing rewrites row 1 and any row whose ID it knows, so it may only ever touch a tab
-// with nothing in Taylor's columns, or one that has Taylor's exact header.
+// with nothing in swift-taylor's columns, or one that has swift-taylor's exact header.
 function isSafeToSync(rows: string[][]): boolean {
   return rows.length === 0 || COLUMNS.every(([header], i) => rows[0][i] === header);
 }
 
-/** The tab in the link if it's safe to write to, otherwise a separate tab for Taylor. */
+/** The tab in the link if it's safe to write to, otherwise a separate tab for swift-taylor. */
 async function chooseTab(token: string, spreadsheetId: string, gid?: number): Promise<Tab> {
   const tabs = await listTabs(token, spreadsheetId);
   const linked = tabs.find((t) => t.sheetId === gid) ?? tabs[0];
@@ -142,7 +142,7 @@ async function chooseTab(token: string, spreadsheetId: string, gid?: number): Pr
   return { spreadsheetId, sheetId, title: NEW_TAB_TITLE };
 }
 
-/** Points Taylor at the sheet in the link, then fills it. Sync problems land in lastError. */
+/** Points swift-taylor at the sheet in the link, then fills it. Sync problems land in lastError. */
 export async function connectSheet(link: string): Promise<void> {
   const { spreadsheetId, gid } = parseSheetLink(link);
   const { refreshToken } = readGoogleLogin();
@@ -167,7 +167,7 @@ async function writeApplications(token: string, tab: Tab, records: ApplicationRe
   const rows = await readRows(token, tab);
   if (!isSafeToSync(rows)) {
     throw new Error(
-      `The header row in the "${tab.title}" tab has changed, so Taylor stopped to avoid damaging your data. Restore it, or link another tab.`,
+      `The header row in the "${tab.title}" tab has changed, so swift-taylor stopped to avoid damaging your data. Restore it, or link another tab.`,
     );
   }
   const idColumn = COLUMNS.length - 1;
@@ -210,7 +210,7 @@ async function runSync(): Promise<void> {
     const token = await getAccessToken(refreshToken);
     const tabs = await listTabs(token, spreadsheetId);
     const tab = tabs.find((t) => t.sheetId === sheetId);
-    if (!tab) throw new Error("Taylor's tab is gone from your sheet. Link a sheet again.");
+    if (!tab) throw new Error("swift-taylor's tab is gone from your sheet. Link a sheet again.");
     await writeApplications(token, tab, await getStore().list());
     updateGoogleLogin({ lastError: undefined, lastSyncedAt: new Date().toISOString() });
   } catch (error) {
@@ -222,13 +222,13 @@ async function runSync(): Promise<void> {
 
 // On globalThis because Next can load this module once per route. Overlapping syncs
 // would both append the same new application.
-const queue = globalThis as { taylorSheetSync?: Promise<void> };
+const queue = globalThis as { swiftTaylorSheetSync?: Promise<void> };
 
 /** Brings the sheet up to date. Never rejects: failures are saved as lastError. */
 export function syncSheet(): Promise<void> {
   // The catch keeps one unexpected failure from blocking every later sync.
-  queue.taylorSheetSync = (queue.taylorSheetSync ?? Promise.resolve())
+  queue.swiftTaylorSheetSync = (queue.swiftTaylorSheetSync ?? Promise.resolve())
     .then(runSync)
     .catch(console.error);
-  return queue.taylorSheetSync;
+  return queue.swiftTaylorSheetSync;
 }

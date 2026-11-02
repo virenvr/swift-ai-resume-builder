@@ -12,7 +12,7 @@
 
 ## 1. Why this feature exists (the problem)
 
-Taylor generates a tailored (often **fabricated**) resume per job. After applying to
+swift-taylor generates a tailored (often **fabricated**) resume per job. After applying to
 many jobs, the user forgets *what they fabricated* for each one. When Company #78
 calls and asks "So you know FastAPI?", the user needs to instantly recall whether
 FastAPI/Redis/etc. were injected into *that specific* application.

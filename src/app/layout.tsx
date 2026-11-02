@@ -14,7 +14,7 @@ const body = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
-  title: "Taylor — Resume AI",
+  title: "swift-taylor — Resume AI",
   description: "JD-first resume tailoring for ATS keyword alignment",
 };
 

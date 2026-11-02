@@ -18,10 +18,10 @@ export async function GET(request: NextRequest) {
   const code = params.get("code");
 
   // Only the login the extension started can finish here, so a website can't send
-  // you to this URL with a code that connects Taylor to its own Google account.
+  // you to this URL with a code that connects swift-taylor to its own Google account.
   const { pendingState } = readGoogleLogin();
   if (!state || state !== pendingState) {
-    return reply("This login link is no longer valid. Start again from the Taylor extension.", 400);
+    return reply("This login link is no longer valid. Start again from the swift-taylor extension.", 400);
   }
   updateGoogleLogin({ pendingState: undefined });
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
   const { spreadsheetId } = readGoogleLogin();
   if (!spreadsheetId) {
-    return reply("Logged in. Go back to Taylor and paste the link to your Google Sheet.");
+    return reply("Logged in. Go back to swift-taylor and paste the link to your Google Sheet.");
   }
 
   // Logging back in carries on with the sheet linked before.

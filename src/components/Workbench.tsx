@@ -113,7 +113,7 @@ function emptyCascadeSteps(): CascadeStepResult[] {
   }));
 }
 
-const RESUME_CHOICE_KEY = "taylor.resumeType";
+const RESUME_CHOICE_KEY = "swift-taylor.resumeType";
 
 function rememberResumeType(type: string) {
   try {
@@ -474,7 +474,7 @@ export function Workbench() {
     const parts = ["1 page"];
     if (header) parts.push(`Header: ${header}`);
     if (pct != null) parts.push(`${pct}% stack`);
-    setPdfToastMessage(`Taylor stitched it · ${parts.join(" · ")}`);
+    setPdfToastMessage(`swift-taylor stitched it · ${parts.join(" · ")}`);
     setPdfToastOpen(true);
   }, [cascadeDone, pdfUrl, steps]);
 
@@ -668,6 +668,52 @@ export function Workbench() {
     setControls((c) => ({ ...c, resumeType }));
   });
 
+  // The extension can run parse + the cascade itself via direct fetch() calls (no
+  // localhost tab) and hand over the finished result instead of the JD, so the
+  // Workbench only needs to adopt it — Open PDF / View Raw LaTeX / I Applied work on
+  // it exactly as if the cascade had run in here.
+  const onExtensionCascadeResult = useEffectEvent(
+    (r: {
+      jdText: string;
+      jdUrl: string;
+      companyName: string;
+      controls: typeof DEFAULT_CONTROLS;
+      suggestions: JdSuggestions | null;
+      keywords: KeywordExtract | null;
+      steps: CascadeStepResult[];
+      changeSummary: ChangeSummary | null;
+      pdfUrl: string | null;
+      pdfFilename: string | null;
+      texFilename: string | null;
+      texSource: string;
+      usedDemo: boolean;
+    }) => {
+      setError(null);
+      setJdText(r.jdText);
+      setJdUrl(r.jdUrl);
+      setCompanyName(r.companyName);
+      setControls(r.controls);
+      setSuggestions(r.suggestions);
+      setKeywords(r.keywords);
+      setSteps(r.steps);
+      setActiveStepId(null);
+      setChangeSummary(r.changeSummary);
+      setPdfUrl(r.pdfUrl);
+      setPdfFilename(r.pdfFilename);
+      setTexFilename(r.texFilename);
+      setTexSource(r.texSource);
+      setCascadeDone(true);
+      setCascadeOpen(true);
+      setApplied(false);
+      setBusy(null);
+      setStatusNote(
+        r.usedDemo
+          ? "Cascade finished in the extension (demo/mocks mixed in)."
+          : "Cascade finished in the extension.",
+      );
+    },
+  );
+
   // Browser extension panel (extension/) hands over the JD from the active tab.
   useEffect(() => {
     if (window.parent === window) return;
@@ -679,19 +725,26 @@ export function Workbench() {
       ) {
         return;
       }
-      if (event.data?.type === "taylor:hello") {
+      if (event.data?.type === "swift-taylor:hello") {
         setExtensionOrigin(event.origin);
         return;
       }
       if (
-        event.data?.type === "taylor:resume-uploaded" &&
+        event.data?.type === "swift-taylor:resume-uploaded" &&
         typeof event.data.resumeType === "string"
       ) {
         onExtensionUpload(event.data.resumeType);
         return;
       }
       if (
-        event.data?.type !== "taylor:jd" ||
+        event.data?.type === "swift-taylor:cascade-result" &&
+        typeof event.data.jdText === "string"
+      ) {
+        onExtensionCascadeResult(event.data);
+        return;
+      }
+      if (
+        event.data?.type !== "swift-taylor:jd" ||
         typeof event.data.jdText !== "string"
       ) {
         return;
@@ -704,10 +757,10 @@ export function Workbench() {
     }
 
     window.addEventListener("message", onMessage);
-    window.parent.postMessage({ type: "taylor:ready" }, "*");
+    window.parent.postMessage({ type: "swift-taylor:ready" }, "*");
     return () => {
       window.removeEventListener("message", onMessage);
-      window.parent.postMessage({ type: "taylor:unready" }, "*");
+      window.parent.postMessage({ type: "swift-taylor:unready" }, "*");
     };
   }, []);
 
@@ -716,7 +769,7 @@ export function Workbench() {
     if (!extensionOrigin) return;
     window.parent.postMessage(
       {
-        type: "taylor:status",
+        type: "swift-taylor:status",
         text: error ?? statusNote,
         busy: busy !== null,
         pdfUrl: cascadeDone && !error ? pdfUrl : null,
@@ -939,10 +992,10 @@ export function Workbench() {
         <div className="max-w-2xl space-y-3">
           <p className="section-label">ATS resume studio</p>
           <h1 className="font-display text-4xl tracking-tight text-[var(--ink)] sm:text-5xl">
-            Taylor
+            swift-taylor
           </h1>
           <p className="text-[1.05rem] leading-relaxed text-[var(--muted)]">
-            Hey — I&apos;m Taylor (yes, like{" "}
+            Hey — I&apos;m swift-taylor (yes, like{" "}
             <span className="font-semibold text-[var(--accent-ink)]">tailor</span>
             ). Paste a JD and I&apos;ll help you stitch a one-page,
             keyword-aligned resume.

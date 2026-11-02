@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Taylor — Resume AI",
+  "name": "swift-taylor",
   "version": "0.1.0",
-  "description": "Tailor your LaTeX resume to the job posting you're viewing. Requires the Taylor app running locally.",
+  "description": "Tailor your LaTeX resume to the job posting you're viewing. Requires the swift-taylor app running locally.",
   "minimum_chrome_version": "121",
   "browser_specific_settings": {
     "gecko": {
-      "id": "taylor-resume-ai@local-app",
+      "id": "swift-taylor-resume-ai@local-app",
       "strict_min_version": "140.0",
       "data_collection_permissions": {
         "required": ["websiteContent", "authenticationInfo"]
@@ -14,7 +14,7 @@
     }
   },
   "action": {
-    "default_title": "Open Taylor"
+    "default_title": "Open swift-taylor"
   },
   "icons": {
     "16": "icons/icon16.png",
@@ -29,7 +29,7 @@
     "default_path": "sidepanel.html"
   },
   "sidebar_action": {
-    "default_title": "Taylor",
+    "default_title": "swift-taylor",
     "default_panel": "sidepanel.html",
     "default_icon": "icons/icon48.png"
   },
